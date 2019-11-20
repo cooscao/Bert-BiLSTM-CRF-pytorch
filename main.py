@@ -122,8 +122,8 @@ if __name__=="__main__":
     parser.add_argument("--finetuning", dest="finetuning", action="store_true")
     parser.add_argument("--top_rnns", dest="top_rnns", action="store_true")
     parser.add_argument("--logdir", type=str, default="checkpoints/01")
-    parser.add_argument("--trainset", type=str, default="data/example.train")
-    parser.add_argument("--validset", type=str, default="data/example.dev")
+    parser.add_argument("--trainset", type=str, default="processed/processed_training_bio.txt")
+    parser.add_argument("--validset", type=str, default="processed/processed_dev_bio.txt")
     hp = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -149,7 +149,7 @@ if __name__=="__main__":
     criterion = nn.CrossEntropyLoss(ignore_index=0) 
 
     for epoch in range(1, hp.n_epochs+1):  # 每个epoch对dev集进行测试
-        
+
         train(model, train_iter, optimizer, criterion)
 
         print(f"=========eval at epoch={epoch}=========")
