@@ -9,7 +9,7 @@ class Net(nn.Module):
 
         self.top_rnns=top_rnns
         if top_rnns:
-            self.rnn = nn.LSTM(bidirectional=True, num_layers=2, input_size=768, hidden_size=768//2, batch_first=True)
+            self.rnn = nn.LSTM(bidirectional=True, num_layers=2, input_size=768, hidden_size=768//2, batch_first=True)  #[128, 74, 768]
         self.fc = nn.Linear(768, vocab_size)
 
         self.device = device

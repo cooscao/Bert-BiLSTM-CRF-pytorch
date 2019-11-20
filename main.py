@@ -60,7 +60,7 @@ def eval(model, iterator, f):
             Y_hat.extend(y_hat.cpu().numpy().tolist())
 
     ## gets results and save
-    with open("temp", 'w') as fout:
+    with open("temp", 'w', encoding='utf-8') as fout:
         for words, is_heads, tags, y_hat in zip(Words, Is_heads, Tags, Y_hat):
             y_hat = [hat for head, hat in zip(is_heads, y_hat) if head == 1]
             preds = [idx2tag[hat] for hat in y_hat]
@@ -70,8 +70,8 @@ def eval(model, iterator, f):
             fout.write("\n")
 
     ## calc metric
-    y_true =  np.array([tag2idx[line.split()[1]] for line in open("temp", 'r').read().splitlines() if len(line) > 0])
-    y_pred =  np.array([tag2idx[line.split()[2]] for line in open("temp", 'r').read().splitlines() if len(line) > 0])
+    y_true =  np.array([tag2idx[line.split()[1]] for line in open("temp", 'r', encoding='utf-8').read().splitlines() if len(line) > 0])
+    y_pred =  np.array([tag2idx[line.split()[2]] for line in open("temp", 'r', encoding='utf-8').read().splitlines() if len(line) > 0])
 
     num_proposed = len(y_pred[y_pred>1])
     num_correct = (np.logical_and(y_true==y_pred, y_true>1)).astype(np.int).sum()
@@ -99,8 +99,8 @@ def eval(model, iterator, f):
             f1=0
 
     final = f + ".P%.2f_R%.2f_F%.2f" %(precision, recall, f1)
-    with open(final, 'w') as fout:
-        result = open("temp", "r").read()
+    with open(final, 'w', encoding='utf-8') as fout:
+        result = open("temp", "r", encoding='utf-8').read()
         fout.write(f"{result}\n")
 
         fout.write(f"precision={precision}\n")
@@ -148,7 +148,8 @@ if __name__=="__main__":
     optimizer = optim.Adam(model.parameters(), lr = hp.lr)
     criterion = nn.CrossEntropyLoss(ignore_index=0) 
 
-    for epoch in range(1, hp.n_epochs+1):
+    for epoch in range(1, hp.n_epochs+1):  # 每个epoch对dev集进行测试
+        
         train(model, train_iter, optimizer, criterion)
 
         print(f"=========eval at epoch={epoch}=========")
