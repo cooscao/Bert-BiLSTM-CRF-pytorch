@@ -23,7 +23,7 @@ bert_model = '/root/workspace/qa_project/chinese_L-12_H-768_A-12'
 tokenizer = BertTokenizer.from_pretrained(bert_model)
 # VOCAB = ('<PAD>', 'O', 'I-LOC', 'B-PER', 'I-PER', 'I-ORG', 'B-LOC', 'B-ORG')
 VOCAB = ('<PAD>', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
-        'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-OPS', 'I-OPS')
+        'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-LAB', 'I-LAB')
 tag2idx = {tag: idx for idx, tag in enumerate(VOCAB)}
 idx2tag = {idx: tag for idx, tag in enumerate(VOCAB)}
 
