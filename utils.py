@@ -34,29 +34,29 @@ class NerDataset(Dataset):
         with open(f_path, 'r', encoding='utf-8') as fr:
             entries = fr.read().strip().split('\n\n')
         sents, tags_li = [], [] # list of lists
-        or entry in entries:
-        words = [line.split()[0] for line in entry.splitlines()]
-        tags = ([line.split()[-1] for line in entry.splitlines()])
-        if len(words) > MAX_LEN:
-            # 先对句号分段
-            word, tag = [], []
-            for char, t in zip(words, tags):
-                
-                if char != '。':
-                    word.append(char)
-                    tag.append(t)
-                else:
-                    sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-                    tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
-                    word, tag = [], []            
-            # 最后的末尾
-            if len(word):
-                sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-                tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
+        for entry in entries:
+            words = [line.split()[0] for line in entry.splitlines()]
+            tags = ([line.split()[-1] for line in entry.splitlines()])
+            if len(words) > MAX_LEN:
+                # 先对句号分段
                 word, tag = [], []
-        else:
-            sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-            tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
+                for char, t in zip(words, tags):
+                    
+                    if char != '。':
+                        word.append(char)
+                        tag.append(t)
+                    else:
+                        sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+                        tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
+                        word, tag = [], []            
+                # 最后的末尾
+                if len(word):
+                    sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+                    tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
+                    word, tag = [], []
+            else:
+                sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+                tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
         self.sents, self.tags_li = sents, tags_li
                 
 

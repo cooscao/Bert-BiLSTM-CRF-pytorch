@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-# from utils import
+from utils import tag2idx, idx2tag
 from pytorch_pretrained_bert import BertModel
 
 
@@ -20,7 +20,7 @@ def log_sum_exp(vec):
 class Net(nn.Module):
     def __init__(self, top_rnns=False, vocab_size=None, device='cpu', finetuning=False):
         super().__init__()
-        self.bert = BertModel.from_pretrained('/root/workspace/qa_project/chinese_L-12_H-768_A-12')
+        self.bert = BertModel.from_pretrained('bert-base-chinese')
 
         self.top_rnns=top_rnns
         if top_rnns:
@@ -61,10 +61,11 @@ class Net(nn.Module):
 
 
 class Bert_BiLSTM_CRF(nn.Module):
-    def __init__(self, vocab_size, tag_to_ix, embedding_dim=768, hidden_dim=768//2):
+    def __init__(self, vocab_size, bert_model, tag_to_ix, embedding_dim=768, hidden_dim=768//2):
         super(Bert_BiLSTM_CRF, self).__init__()
-        self.bert = BertModel.from_pretrained('/root/workspace/qa_project/chinese_L-12_H-768_A-12')
-        self.embedding_dim = embedding_dim
+        self.bert = BertModel.from_pretrained(bert_model)
+        self.bert.eval()
+        self.embedding_dim = embedding_dim  # 768
         self.hidden_dim = hidden_dim
         self.vocab_size = vocab_size
         self.tag_to_ix = tag_to_ix
@@ -72,20 +73,22 @@ class Bert_BiLSTM_CRF(nn.Module):
 
         # self.word_embeds = nn.Embedding(vocab_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
-                            num_layers=2, bidirectional=True)
+                            num_layers=2, bidirectional=True, batch_first=True)
 
         # Maps the output of the LSTM into tag space.
         self.hidden2tag = nn.Linear(hidden_dim, self.tagset_size)
 
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
+
+        ## 标签的转移矩阵
         self.transitions = nn.Parameter(
             torch.randn(self.tagset_size, self.tagset_size))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
-        self.transitions.data[tag_to_ix[START_TAG], :] = -10000
-        self.transitions.data[:, tag_to_ix[STOP_TAG]] = -10000
+        self.transitions.data[tag_to_ix['CLS'], :] = -10000
+        self.transitions.data[:, tag_to_ix['SEP']] = -10000
 
         self.hidden = self.init_hidden()
 
@@ -97,7 +100,7 @@ class Bert_BiLSTM_CRF(nn.Module):
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.)
         # START_TAG has all of the score.
-        init_alphas[0][self.tag_to_ix[START_TAG]] = 0.
+        init_alphas[0][self.tag_to_ix['CLS']] = 0.
 
         # Wrap in a variable so that we will get automatic backprop
         forward_var = init_alphas
@@ -124,9 +127,15 @@ class Bert_BiLSTM_CRF(nn.Module):
         alpha = log_sum_exp(terminal_var)
         return alpha
 
+    def _get_bert_enc(self, x):
+        # self.bert.eval()
+        encode_layers, _ = self.bert(x)
+        enc = encode_layers[-1]
+        return enc
+
     def _get_lstm_features(self, sentence):
         self.hidden = self.init_hidden()
-        embeds = self.word_embeds(sentence).view(len(sentence), 1, -1)
+        embeds = self._get_bert_enc(sentence)
         lstm_out, self.hidden = self.lstm(embeds, self.hidden)
         lstm_out = lstm_out.view(len(sentence), self.hidden_dim)
         lstm_feats = self.hidden2tag(lstm_out)
