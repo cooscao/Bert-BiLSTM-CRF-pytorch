@@ -19,7 +19,7 @@ from pytorch_pretrained_bert import BertTokenizer
 
 logger = logging.getLogger(__name__)
 
-bert_model = 'bert-base-chinese'
+bert_model = '/root/workspace/qa_project/chinese_L-12_H-768_A-12'
 tokenizer = BertTokenizer.from_pretrained(bert_model)
 # VOCAB = ('<PAD>', 'O', 'I-LOC', 'B-PER', 'I-PER', 'I-ORG', 'B-LOC', 'B-ORG')
 VOCAB = ('<PAD>', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
@@ -43,8 +43,9 @@ class NerDataset(Dataset):
                 for char, t in zip(words, tags):
                     
                     if char != '。':
-                        word.append(char)
-                        tag.append(t)
+                        if char != '\ue236':   # 测试集中有这个字符
+                            word.append(char)
+                            tag.append(t)
                     else:
                         sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
                         tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
@@ -55,8 +56,8 @@ class NerDataset(Dataset):
                     tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
                     word, tag = [], []
             else:
-                sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-                tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
+                sents.append(["[CLS]"] + words[:MAX_LEN] + ["[SEP]"])
+                tags_li.append(["<PAD>"] + tags[:MAX_LEN] + ["<PAD>"])
         self.sents, self.tags_li = sents, tags_li
                 
 
@@ -67,6 +68,7 @@ class NerDataset(Dataset):
         for w, t in zip(words, tags):
             tokens = tokenizer.tokenize(w) if w not in ("[CLS]", "[SEP]") else [w]
             xx = tokenizer.convert_tokens_to_ids(tokens)
+            # assert len(tokens) == len(xx), f"len(tokens)={len(tokens)}, len(xx)={len(xx)}"
 
             # 中文没有英文wordpiece后分成几块的情况
             is_head = [1] + [0]*(len(tokens) - 1)
