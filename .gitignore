@@ -3,6 +3,7 @@ __pycache__/
 checkpoints/
 *.py[cod]
 *$py.class
+.vscode/
 
 # C extensions
 *.so

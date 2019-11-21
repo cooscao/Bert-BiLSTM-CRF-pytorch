@@ -19,13 +19,14 @@ from pytorch_pretrained_bert import BertTokenizer
 
 logger = logging.getLogger(__name__)
 
-bert_model = '/root/workspace/qa_project/chinese_L-12_H-768_A-12'
+bert_model = 'bert-base-chinese'
 tokenizer = BertTokenizer.from_pretrained(bert_model)
 # VOCAB = ('<PAD>', 'O', 'I-LOC', 'B-PER', 'I-PER', 'I-ORG', 'B-LOC', 'B-ORG')
 VOCAB = ('<PAD>', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
         'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-LAB', 'I-LAB')
 tag2idx = {tag: idx for idx, tag in enumerate(VOCAB)}
 idx2tag = {idx: tag for idx, tag in enumerate(VOCAB)}
+MAX_LEN = 256 - 2
 
 
 class NerDataset(Dataset):
@@ -33,19 +34,34 @@ class NerDataset(Dataset):
         with open(f_path, 'r', encoding='utf-8') as fr:
             entries = fr.read().strip().split('\n\n')
         sents, tags_li = [], [] # list of lists
-        for entry in entries:
-            words = [line.split()[0] for line in entry.splitlines()]
-            tags = ([line.split()[-1] for line in entry.splitlines()])
-            sents.append(["[CLS]"] + words + ["[SEP]"])  # 每个句子前后加['CLS']和['SEP']
-            tags_li.append(["<PAD>"] + tags + ["<PAD>"])
+        or entry in entries:
+        words = [line.split()[0] for line in entry.splitlines()]
+        tags = ([line.split()[-1] for line in entry.splitlines()])
+        if len(words) > MAX_LEN:
+            # 先对句号分段
+            word, tag = [], []
+            for char, t in zip(words, tags):
+                
+                if char != '。':
+                    word.append(char)
+                    tag.append(t)
+                else:
+                    sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+                    tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
+                    word, tag = [], []            
+            # 最后的末尾
+            if len(word):
+                sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+                tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
+                word, tag = [], []
+        else:
+            sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
+            tags_li.append(["PAD"] + tag[:MAX_LEN] + ["PAD"])
         self.sents, self.tags_li = sents, tags_li
                 
 
     def __getitem__(self, idx):
         words, tags = self.sents[idx], self.tags_li[idx]
-        if len(words) > 256:
-            words = words[:256]
-            tags = tags[:256]
         x, y = [], []
         is_heads = []
         for w, t in zip(words, tags):
