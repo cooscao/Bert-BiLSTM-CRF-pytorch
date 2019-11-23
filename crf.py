@@ -1,62 +1,50 @@
-#-*- coding:utf-8 -*-
-
+# -*- encoding: utf-8 -*-
+'''
+@File    :   crf.py
+@Time    :   2019/11/23 17:35:36
+@Author  :   Cao Shuai
+@Version :   1.0
+@Contact :   caoshuai@stu.scu.edu.cn
+@License :   (C)Copyright 2018-2019, MILAB_SCU
+@Desc    :   None
+'''
+ 
 import torch
 import torch.nn as nn
 from pytorch_pretrained_bert import BertModel
 
-def argmax(vec):
-    # return the argmax as a python int
-    _, idx = torch.max(vec, 1)
-    return idx.item()
-
-
-def log_sum_exp(vec):
-    max_score = vec[0, argmax(vec)]
-    max_score_broadcast = max_score.view(1, -1).expand(1, vec.size()[1])
-    return max_score + \
-        torch.log(torch.sum(torch.exp(vec - max_score_broadcast)))
+BERT_VOCAB = ('<PAD>', '[CLS]', '[SEP]', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
+        'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-LAB', 'I-LAB')
+tag2idx = {tag: idx for idx, tag in enumerate(BERT_VOCAB)}
+idx2tag = {idx: tag for idx, tag in enumerate(BERT_VOCAB)}
 
 class Bert_BiLSTM_CRF(nn.Module):
-    def __init__(self, vocab_size, bert_model, tag_to_ix, embedding_dim=768, hidden_dim=768//2):
+    def __init__(self, tag_to_ix, hidden_dim=768):
         super(Bert_BiLSTM_CRF, self).__init__()
-        self.bert = BertModel.from_pretrained(bert_model)
-        self.bert.eval()
-        self.embedding_dim = embedding_dim  # 768
-        self.hidden_dim = hidden_dim
-        self.vocab_size = vocab_size
-        self.tag_to_ix = tag_to_ix
-        self.tagset_size = len(tag_to_ix)
+        self.tag2ix = tag_to_ix
+        self.target_size = len(tag_to_ix)
+        # self.hidden = self.init_hidden()
+        self.lstm = nn.LSTM(bidirectional=True, num_layers=2, input_size=768, hidden_size=hidden_dim//2, batch_first=True)
+        self.transtions = nn.Parameter(torch.randn(
+            self.target_size, self.target_size
+        ))
+        self.fc = nn.Linear(hidden_dim, self.target_size)
+        self.bert = BertModel.from_pretrained('bert-base-chinese')
+        self.bert.eval()  # 知用来取bert embedding
+        self.transitions.data[tag_to_ix['[CLS]'], :] = -10000
+        self.transitions.data[:, tag_to_ix['[SEP]']] = -10000
 
-        # self.word_embeds = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
-                            num_layers=2, bidirectional=True, batch_first=True)
-
-        # Maps the output of the LSTM into tag space.
-        self.hidden2tag = nn.Linear(hidden_dim, self.tagset_size)
-
-        # Matrix of transition parameters.  Entry i,j is the score of
-        # transitioning *to* i *from* j.
-
-        ## 标签的转移矩阵
-        self.transitions = nn.Parameter(
-            torch.randn(self.tagset_size, self.tagset_size))
-
-        # These two statements enforce the constraint that we never transfer
-        # to the start tag and we never transfer from the stop tag
-        self.transitions.data[tag_to_ix['CLS'], :] = -10000
-        self.transitions.data[:, tag_to_ix['SEP']] = -10000
-
-        self.hidden = self.init_hidden()
 
     def init_hidden(self):
         return (torch.randn(2, 1, self.hidden_dim // 2),
                 torch.randn(2, 1, self.hidden_dim // 2))
 
+
     def _forward_alg(self, feats):
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.)
         # START_TAG has all of the score.
-        init_alphas[0][self.tag_to_ix['CLS']] = 0.
+        init_alphas[0][self.tag_to_ix['[CLS]']] = 0.
 
         # Wrap in a variable so that we will get automatic backprop
         forward_var = init_alphas
@@ -79,33 +67,28 @@ class Bert_BiLSTM_CRF(nn.Module):
                 # scores.
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
-        terminal_var = forward_var + self.transitions[self.tag_to_ix[STOP_TAG]]
+        terminal_var = forward_var + self.transitions[self.tag_to_ix['[SEP]']]
         alpha = log_sum_exp(terminal_var)
         return alpha
-
-    def _get_bert_enc(self, x):
-        # self.bert.eval()
-        encode_layers, _ = self.bert(x)
-        enc = encode_layers[-1]
-        return enc
-
-    def _get_lstm_features(self, sentence):
-        self.hidden = self.init_hidden()
-        embeds = self._get_bert_enc(sentence)
-        lstm_out, self.hidden = self.lstm(embeds, self.hidden)
-        lstm_out = lstm_out.view(len(sentence), self.hidden_dim)
-        lstm_feats = self.hidden2tag(lstm_out)
-        return lstm_feats
 
     def _score_sentence(self, feats, tags):
         # Gives the score of a provided tag sequence
         score = torch.zeros(1)
-        tags = torch.cat([torch.tensor([self.tag_to_ix[START_TAG]], dtype=torch.long), tags])
+        tags = torch.cat([torch.tensor([self.tag_to_ix['[CLS]']], dtype=torch.long), tags])
         for i, feat in enumerate(feats):
             score = score + \
                 self.transitions[tags[i + 1], tags[i]] + feat[tags[i + 1]]
-        score = score + self.transitions[self.tag_to_ix[STOP_TAG], tags[-1]]
+        score = score + self.transitions[self.tag_to_ix['[SEP]'], tags[-1]]
         return score
+
+    def _bert_enc(self, x):
+        """
+        x: [batchsize, sent_len]
+        enc: [batch_size, sent_len, 768]
+        """
+        encoded_layer, _  = self.bert(x)
+        enc = encoded_layer[-1]
+        return enc
 
     def _viterbi_decode(self, feats):
         backpointers = []
@@ -157,6 +140,22 @@ class Bert_BiLSTM_CRF(nn.Module):
         gold_score = self._score_sentence(feats, tags)
         return forward_score - gold_score
 
+
+    def _get_lstm_features(self, sentence):
+        """sentence is the ids"""
+        self.hidden = self.init_hidden()
+        embeds = self._bert_enc(sentence)  # [8, 75, 768]
+        # 过lstm
+        enc, _ = self.lstm(embeds)
+        lstm_feats = self.fc(enc)
+        return lstm_feats  # [8, 75, 16]
+
+    def neg_log_likelihood(self, sentence, tags):
+        feats = self._get_lstm_features(sentence)
+        forward_score = self._forward_alg(feats)
+        gold_score = self._score_sentence(feats, tags)
+        return forward_score - gold_score
+
     def forward(self, sentence):  # dont confuse this with _forward_alg above.
         # Get the emission scores from the BiLSTM
         lstm_feats = self._get_lstm_features(sentence)
@@ -164,3 +163,4 @@ class Bert_BiLSTM_CRF(nn.Module):
         # Find the best path, given the features.
         score, tag_seq = self._viterbi_decode(lstm_feats)
         return score, tag_seq
+    
