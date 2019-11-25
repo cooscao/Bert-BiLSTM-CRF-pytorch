@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 bert_model = '/root/workspace/qa_project/chinese_L-12_H-768_A-12'
 tokenizer = BertTokenizer.from_pretrained(bert_model)
 # VOCAB = ('<PAD>', 'O', 'I-LOC', 'B-PER', 'I-PER', 'I-ORG', 'B-LOC', 'B-ORG')
-VOCAB = ('<PAD>', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
+VOCAB = ('<PAD>', '[CLS]', '[SEP]', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
         'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-LAB', 'I-LAB')
 tag2idx = {tag: idx for idx, tag in enumerate(VOCAB)}
 idx2tag = {idx: tag for idx, tag in enumerate(VOCAB)}
@@ -48,16 +48,16 @@ class NerDataset(Dataset):
                             tag.append(t)
                     else:
                         sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-                        tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
+                        tags_li.append(['[CLS]'] + tag[:MAX_LEN] + ['[SEP]'])
                         word, tag = [], []            
                 # 最后的末尾
                 if len(word):
                     sents.append(["[CLS]"] + word[:MAX_LEN] + ["[SEP]"])
-                    tags_li.append(["<PAD>"] + tag[:MAX_LEN] + ["<PAD>"])
+                    tags_li.append(['[CLS]'] + tag[:MAX_LEN] + ['[SEP]'])
                     word, tag = [], []
             else:
                 sents.append(["[CLS]"] + words[:MAX_LEN] + ["[SEP]"])
-                tags_li.append(["<PAD>"] + tags[:MAX_LEN] + ["<PAD>"])
+                tags_li.append(['[CLS]'] + tags[:MAX_LEN] + ['[SEP]'])
         self.sents, self.tags_li = sents, tags_li
                 
 
@@ -72,7 +72,7 @@ class NerDataset(Dataset):
 
             # 中文没有英文wordpiece后分成几块的情况
             is_head = [1] + [0]*(len(tokens) - 1)
-            t = [t] + ["<PAD>"] * (len(tokens) - 1)
+            t = [t] + ['<PAD>'] * (len(tokens) - 1)
             yy = [tag2idx[each] for each in t]  # (T,)
 
             x.extend(xx)

@@ -5,25 +5,28 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils import data
 from model import Net
+from crf import Bert_BiLSTM_CRF
 from utils import NerDataset, pad, VOCAB, tokenizer, tag2idx, idx2tag
 import os
 import numpy as np
 import argparse
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-def train(model, iterator, optimizer, criterion):
+def train(model, iterator, optimizer, criterion, device):
     model.train()
     for i, batch in enumerate(iterator):
         words, x, is_heads, tags, y, seqlens = batch
+        x = x.to(device)
+        y = y.to(device)
         _y = y # for monitoring
         optimizer.zero_grad()
-        logits, y, _ = model(x, y) # logits: (N, T, VOCAB), y: (N, T)
+        loss = model.neg_log_likelihood(x, y) # logits: (N, T, VOCAB), y: (N, T)
 
-        logits = logits.view(-1, logits.shape[-1]) # (N*T, VOCAB)
-        y = y.view(-1)  # (N*T,)
+        # logits = logits.view(-1, logits.shape[-1]) # (N*T, VOCAB)
+        # y = y.view(-1)  # (N*T,)
 
-        loss = criterion(logits, y)
+        # loss = criterion(logits, y)
         loss.backward()
 
         optimizer.step()
@@ -43,15 +46,17 @@ def train(model, iterator, optimizer, criterion):
         if i%10==0: # monitoring
             print(f"step: {i}, loss: {loss.item()}")
 
-def eval(model, iterator, f):
+def eval(model, iterator, f, device):
     model.eval()
 
     Words, Is_heads, Tags, Y, Y_hat = [], [], [], [], []
     with torch.no_grad():
         for i, batch in enumerate(iterator):
             words, x, is_heads, tags, y, seqlens = batch
+            x = x.to(device)
+            # y = y.to(device)
 
-            _, _, y_hat = model(x, y)  # y_hat: (N, T)
+            _, y_hat = model(x)  # y_hat: (N, T)
 
             Words.extend(words)
             Is_heads.extend(is_heads)
@@ -128,11 +133,13 @@ if __name__=="__main__":
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = Net(hp.top_rnns, len(VOCAB), device, hp.finetuning).cuda()
-    model = nn.DataParallel(model)
+    model = Bert_BiLSTM_CRF(tag2idx).cuda()
+    print('Initial model Done')
+    # model = nn.DataParallel(model)
 
     train_dataset = NerDataset(hp.trainset)
     eval_dataset = NerDataset(hp.validset)
+    print('Load Data Done')
 
     train_iter = data.DataLoader(dataset=train_dataset,
                                  batch_size=hp.batch_size,
@@ -148,14 +155,15 @@ if __name__=="__main__":
     optimizer = optim.Adam(model.parameters(), lr = hp.lr)
     criterion = nn.CrossEntropyLoss(ignore_index=0) 
 
+    print('Start Train...,')
     for epoch in range(1, hp.n_epochs+1):  # 每个epoch对dev集进行测试
 
-        train(model, train_iter, optimizer, criterion)
+        train(model, train_iter, optimizer, criterion, device)
 
         print(f"=========eval at epoch={epoch}=========")
         if not os.path.exists(hp.logdir): os.makedirs(hp.logdir)
         fname = os.path.join(hp.logdir, str(epoch))
-        precision, recall, f1 = eval(model, eval_iter, fname)
+        precision, recall, f1 = eval(model, eval_iter, fname, device)
 
         torch.save(model.state_dict(), f"{fname}.pt")
         print(f"weights were saved to {fname}.pt")
