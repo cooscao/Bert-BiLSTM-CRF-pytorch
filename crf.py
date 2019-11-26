@@ -13,11 +13,6 @@ import torch
 import torch.nn as nn
 from pytorch_pretrained_bert import BertModel
 
-BERT_VOCAB = ('<PAD>', '[CLS]', '[SEP]', 'O', 'B-INF', 'I-INF', 'B-PAT', 'I-PAT', 'B-OPS', 
-        'I-OPS', 'B-DSE', 'I-DSE', 'B-DRG', 'I-DRG', 'B-LAB', 'I-LAB')
-tag2idx = {tag: idx for idx, tag in enumerate(BERT_VOCAB)}
-idx2tag = {idx: tag for idx, tag in enumerate(BERT_VOCAB)}
-
 
 def argmax(vec):
     # return the argmax as a python int

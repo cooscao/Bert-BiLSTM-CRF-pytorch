@@ -3,15 +3,17 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import os
+import numpy as np
+import argparse
 from torch.utils import data
 from model import Net
 from crf import Bert_BiLSTM_CRF
 from utils import NerDataset, pad, VOCAB, tokenizer, tag2idx, idx2tag
-import os
-import numpy as np
-import argparse
+
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
 
 def train(model, iterator, optimizer, criterion, device):
     model.train()
@@ -25,6 +27,7 @@ def train(model, iterator, optimizer, criterion, device):
 
         # logits = logits.view(-1, logits.shape[-1]) # (N*T, VOCAB)
         # y = y.view(-1)  # (N*T,)
+        # writer.add_scalar('data/loss', loss.item(), )
 
         # loss = criterion(logits, y)
         loss.backward()
