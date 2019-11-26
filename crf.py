@@ -50,7 +50,7 @@ class Bert_BiLSTM_CRF(nn.Module):
         self.end_label_id = self.tag_to_ix['[SEP]']
         self.fc = nn.Linear(hidden_dim, self.tagset_size)
         self.bert = BertModel.from_pretrained('/root/workspace/qa_project/chinese_L-12_H-768_A-12')
-        self.bert.eval()  # 知用来取bert embedding
+        # self.bert.eval()  # 知用来取bert embedding
         
         self.transitions.data[self.start_label_id, :] = -10000
         self.transitions.data[:, self.end_label_id] = -10000
@@ -70,11 +70,11 @@ class Bert_BiLSTM_CRF(nn.Module):
         '''
         
         # T = self.max_seq_length
-        T = feats.shape[1]
+        T = feats.shape[1]  
         batch_size = feats.shape[0]
         
         # alpha_recursion,forward, alpha(zt)=p(zt,bar_x_1:t)
-        log_alpha = torch.Tensor(batch_size, 1, self.tagset_size).fill_(-10000.).to(self.device)
+        log_alpha = torch.Tensor(batch_size, 1, self.tagset_size).fill_(-10000.).to(self.device)  #[batch_size, 1, 16]
         # normal_alpha_0 : alpha[0]=Ot[0]*self.PIs
         # self.start_label has all of the score. it is log,0 is p=1
         log_alpha[:, 0, self.start_label_id] = 0
@@ -109,8 +109,9 @@ class Bert_BiLSTM_CRF(nn.Module):
         x: [batchsize, sent_len]
         enc: [batch_size, sent_len, 768]
         """
-        encoded_layer, _  = self.bert(x)
-        enc = encoded_layer[-1]
+        with torch.no_grad():
+            encoded_layer, _  = self.bert(x)
+            enc = encoded_layer[-1]
         return enc
 
     def _viterbi_decode(self, feats):
@@ -125,7 +126,7 @@ class Bert_BiLSTM_CRF(nn.Module):
         # batch_transitions=self.transitions.expand(batch_size,self.tagset_size,self.tagset_size)
 
         log_delta = torch.Tensor(batch_size, 1, self.tagset_size).fill_(-10000.).to(self.device)
-        log_delta[:, 0, self.start_label_id] = 0
+        log_delta[:, 0, self.start_label_id] = 0.
         
         # psi is for the vaule of the last latent that make P(this_latent) maximum.
         psi = torch.zeros((batch_size, T, self.tagset_size), dtype=torch.long)  # psi[0]=0000 useless
@@ -151,7 +152,7 @@ class Bert_BiLSTM_CRF(nn.Module):
 
 
     def neg_log_likelihood(self, sentence, tags):
-        feats = self._get_lstm_features(sentence)
+        feats = self._get_lstm_features(sentence)  #[batch_size, max_len, 16]
         forward_score = self._forward_alg(feats)
         gold_score = self._score_sentence(feats, tags)
         return torch.mean(forward_score - gold_score)
@@ -159,7 +160,7 @@ class Bert_BiLSTM_CRF(nn.Module):
 
     def _get_lstm_features(self, sentence):
         """sentence is the ids"""
-        self.hidden = self.init_hidden()
+        # self.hidden = self.init_hidden()
         embeds = self._bert_enc(sentence)  # [8, 75, 768]
         # 过lstm
         enc, _ = self.lstm(embeds)

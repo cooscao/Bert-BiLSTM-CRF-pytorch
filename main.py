@@ -11,7 +11,7 @@ import os
 import numpy as np
 import argparse
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def train(model, iterator, optimizer, criterion, device):
     model.train()
