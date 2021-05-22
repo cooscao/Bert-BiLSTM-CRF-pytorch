@@ -3,8 +3,8 @@ bert-bilstm-crf implemented in pytorch for named entity recognition.
 
 ```
 python == 3.6
-pytorch == 1.3
-transformer == 2.1.1
+pytorch == 0.4.1
+pytorch_pretrained_bert == 0.6.1
 ```
 
 ### Data
